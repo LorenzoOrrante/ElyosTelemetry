@@ -81,19 +81,21 @@ io.on("connection", (socket) => {
       raceState.startTime = now;
       raceState.lastLapStartTime = now;
       raceState.laps = [];
+      raceState.lapsNumber = 1;
     } else if (data.accion === "RESET_RACE") {
       raceState.isRunning = false;
       raceState.startTime = null;
+      raceState.lastLapStartTime = null;
       raceState.laps = [];
       raceState.lapsNumber = 1;
-    } else if (data.accion === "NEW_LAP") {
+    } else if (data.accion === "NEW_LAP" && raceState.isRunning && raceState.lastLapStartTime) {
       const duration = Math.floor((now - raceState.lastLapStartTime) / 1000);
       raceState.laps.push(duration);
       raceState.lapsNumber += 1;
       raceState.lastLapStartTime = now;
     }
 
-    io.emit("ejecutar-accion", data);
+    io.emit("ejecutar-accion", { accion: data.accion, state: raceState });
   });
 
   socket.on("disconnect", () => {

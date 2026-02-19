@@ -22,7 +22,6 @@ const DashboardPage = () => {
   const [canControl, setCanControl] = useState(false);
 
   const [laps, setLaps] = useState([]);
-  const [lapStartTime, setLapStartTime] = useState(0);
   const [lapsNumber, setLapsNumber] = useState(1);
   const [averageLapTime, setAverageLapTime] = useState(0);
 
@@ -30,6 +29,8 @@ const DashboardPage = () => {
   const [timerActive, setTimerActive] = useState(false);
   const [currentLapTime, setCurrentLapTime] = useState(0);
   const [remaining_time, setRemainingTime] = useState(2100)
+  const [raceStartTime, setRaceStartTime] = useState(null);
+  const [lastLapStartTime, setLastLapStartTime] = useState(null);
 
   const showDashboard = true;
   const [isRunning, setIsRunning] = useState(false);
@@ -70,35 +71,56 @@ const DashboardPage = () => {
   const [numberOfSatellites, setNumberOfSatellites] = useState(0);
   const [airSpeed, setAirSpeed] = useState(0);
 
+  const RACE_DURATION_SECONDS = 2100;
+
+  const calculateAverageLapTime = useCallback((lapsArray = []) => {
+    if (!lapsArray.length) return 0;
+    return lapsArray.reduce((acc, lap) => acc + lap, 0) / lapsArray.length;
+  }, []);
+
+  const syncRaceState = useCallback((state) => {
+    const lapsFromState = state?.laps ?? [];
+    const lapsNumberFromState = state?.lapsNumber ?? 1;
+
+    setLaps(lapsFromState);
+    setLapsNumber(lapsNumberFromState);
+    setAverageLapTime(calculateAverageLapTime(lapsFromState));
+
+    if (!state?.isRunning) {
+      setIsRunning(false);
+      setTimerActive(false);
+      setRunningTime(0);
+      setCurrentLapTime(0);
+      setRemainingTime(RACE_DURATION_SECONDS);
+      setRaceStartTime(null);
+      setLastLapStartTime(null);
+      return;
+    }
+
+    const now = Date.now();
+    const raceStart = state.startTime ?? now;
+    const lapStart = state.lastLapStartTime ?? raceStart;
+    const elapsedSeconds = Math.max(0, Math.floor((now - raceStart) / 1000));
+    const elapsedCurrentLap = Math.max(0, Math.floor((now - lapStart) / 1000));
+
+    setIsRunning(true);
+    setTimerActive(true);
+    setRaceStartTime(raceStart);
+    setLastLapStartTime(lapStart);
+    setRunningTime(elapsedSeconds);
+    setCurrentLapTime(elapsedCurrentLap);
+    setRemainingTime(Math.max(0, RACE_DURATION_SECONDS - elapsedSeconds));
+  }, [calculateAverageLapTime]);
+
   // Enter initial state
   useEffect(() => {
     socket.on("init-state", (state) => {
       console.log("Sincronizando estado inicial:", state);
-      
-      if (state.isRunning) {
-        const secondsPassedSinceBeginning = Math.floor((Date.now() - state.startTime) / 1000);
-        const now = Date.now();
-        const secondsInCurrentLap = Math.floor((now - state.lastLapStartTime) / 1000);
-
-        setIsRunning(true);
-        setTimerActive(true);
-
-        setCurrentLapTime(secondsInCurrentLap);
-        setLapsNumber(state.lapsNumber);
-        setLaps(state.laps)
-        setRunningTime(secondsPassedSinceBeginning);
-        setRemainingTime(2100 - secondsPassedSinceBeginning);
-
-        var avg = state.laps.reduce((acc, lap) => acc + lap, 0) / state.laps.length;
-        if (Number.isNaN(avg)) {
-          avg = 0;
-        }
-        setAverageLapTime(avg);
-      }
+      syncRaceState(state);
     });
 
     return () => socket.off("init-state");
-  }, []);
+  }, [syncRaceState]);
 
   useEffect(() => {
     // Pedir datos al cargar por primera vez
@@ -159,55 +181,36 @@ const DashboardPage = () => {
   const executeResetLogic = useCallback(() => {
     setIsRunning(false);
     setRunningTime(0);
-    setRemainingTime(2100);
+    setRemainingTime(RACE_DURATION_SECONDS);
     setTimerActive(false);
     setLaps([]);
-    setLapStartTime(0);
     setAverageLapTime(0);
     setCurrentLapTime(0);
     setLapsNumber(1);
+    setRaceStartTime(null);
+    setLastLapStartTime(null);
     setDataHistory([]);
     setTotalAh(0);
     setTotalKm(0);
     setTotalWh(0);
     setCounter(0);
-  }, []);
-
-  const executeNewLapLogic = useCallback(() => {
-    setLaps((prevLaps) => {
-      const lapTime = runningTime - lapStartTime;
-      const newLaps = [...prevLaps, lapTime];
-      const avg = newLaps.length > 0 ? newLaps.reduce((a, b) => a + b, 0) / newLaps.length : 0;
-      setAverageLapTime(avg);
-      return newLaps;
-    });
-    setLapStartTime(runningTime);
-    setCurrentLapTime(0);
-    setLapsNumber((prev) => prev + 1);
-  }, [runningTime, lapStartTime]);
+  }, [RACE_DURATION_SECONDS]);
 
   // Socket effects
   useEffect(() => {
     socket.on("ejecutar-accion", (data) => {
       console.log("Acción remota recibida:", data.accion);
-      switch(data.accion) {
-        case "START_RACE":
-          setIsRunning(true);
-          setTimerActive(true);
-          setCurrentLapTime(0);
-          break;
-        case "RESET_RACE":
-          executeResetLogic();
-          break;
-        case "NEW_LAP":
-          executeNewLapLogic();
-          break;
-        default:
-          break;
+      if (data.state) {
+        syncRaceState(data.state);
+        return;
+      }
+
+      if (data.accion === "RESET_RACE") {
+        executeResetLogic();
       }
     });
     return () => socket.off("ejecutar-accion");
-  }, [executeNewLapLogic, executeResetLogic]);
+  }, [executeResetLogic, syncRaceState]);
 
   // Check authentication
   useEffect(() => {
@@ -327,15 +330,18 @@ const DashboardPage = () => {
   // Count the time
   useEffect(() => {
     let interval = null;
-    if (timerActive) {
+    if (timerActive && raceStartTime) {
       interval = setInterval(() => {
-        setRunningTime(prev => prev + 1);
-        setRemainingTime(prev => prev - 1);
-        setCurrentLapTime(prev => prev + 1);
+        const now = Date.now();
+        const elapsedSeconds = Math.max(0, Math.floor((now - raceStartTime) / 1000));
+        const elapsedCurrentLap = Math.max(0, Math.floor((now - (lastLapStartTime ?? raceStartTime)) / 1000));
+        setRunningTime(elapsedSeconds);
+        setRemainingTime(Math.max(0, RACE_DURATION_SECONDS - elapsedSeconds));
+        setCurrentLapTime(elapsedCurrentLap);
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [timerActive]);
+  }, [timerActive, raceStartTime, lastLapStartTime, RACE_DURATION_SECONDS]);
 
   useEffect(() => {
     if (!showDashboard || !isRunning) return;
