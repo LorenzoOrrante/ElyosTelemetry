@@ -352,6 +352,9 @@ const DashboardPage = () => {
         .then((data) => {
           if (Array.isArray(data) && data.length > 0) {
             const latest = data[data.length - 1];
+            if (Number.isInteger(latest.lap_number) && latest.lap_number > 0) {
+              setLapsNumber(latest.lap_number);
+            }
             setVelocity_x(latest.velocity_x);
             setVelocity_y(latest.velocity_y);
             setCurrent(latest.current);

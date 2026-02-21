@@ -57,6 +57,7 @@ const createTables = async () => {
             CREATE TABLE IF NOT EXISTS lectures (
                 id SERIAL PRIMARY KEY,
                 session_id INTEGER REFERENCES sessions(id) ON DELETE CASCADE,
+                lap_number INTEGER,
                 timestamp TIMESTAMPTZ,
                 voltage_battery NUMERIC(6,2),
                 current NUMERIC(6,2),

@@ -3,6 +3,10 @@ import http from 'http';
 import { Server } from 'socket.io';
 import app from './app.js';
 import pool from './config/dbConfig.js';
+import {
+  incrementCurrentLapNumber,
+  resetCurrentLapNumber
+} from './raceStateStore.js';
 
 import os from 'os';
 
@@ -82,17 +86,20 @@ io.on("connection", (socket) => {
       raceState.lastLapStartTime = now;
       raceState.laps = [];
       raceState.lapsNumber = 1;
+      resetCurrentLapNumber();
     } else if (data.accion === "RESET_RACE") {
       raceState.isRunning = false;
       raceState.startTime = null;
       raceState.lastLapStartTime = null;
       raceState.laps = [];
       raceState.lapsNumber = 1;
+      resetCurrentLapNumber();
     } else if (data.accion === "NEW_LAP" && raceState.isRunning && raceState.lastLapStartTime) {
       const duration = Math.floor((now - raceState.lastLapStartTime) / 1000);
       raceState.laps.push(duration);
       raceState.lapsNumber += 1;
       raceState.lastLapStartTime = now;
+      incrementCurrentLapNumber();
     }
 
     io.emit("ejecutar-accion", { accion: data.accion, state: raceState });
