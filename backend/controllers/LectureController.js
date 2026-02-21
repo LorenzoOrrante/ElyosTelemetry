@@ -59,6 +59,15 @@ export const createLecture = async (req, res) => {
     air_speed
   } = req.body;
 
+  let normalizedTimestamp = null;
+  if (timestamp !== undefined && timestamp !== null && timestamp !== '') {
+    const parsedTimestamp = new Date(timestamp);
+    if (Number.isNaN(parsedTimestamp.getTime())) {
+      return res.status(400).json({ error: 'timestamp must be a valid ISO date value' });
+    }
+    normalizedTimestamp = parsedTimestamp.toISOString();
+  }
+
   try {
     const result = await pool.query(
       `INSERT INTO lectures (
@@ -75,7 +84,7 @@ export const createLecture = async (req, res) => {
         $18, $19, $20
       ) RETURNING *`,
       [
-        toNull(session_id), timestamp, toNull(voltage_battery), toNull(current), toNull(latitude), toNull(longitude),
+        toNull(session_id), normalizedTimestamp, toNull(voltage_battery), toNull(current), toNull(latitude), toNull(longitude),
         toNull(acceleration_x), toNull(acceleration_y), toNull(acceleration_z),
         toNull(orientation_x), toNull(orientation_y), toNull(orientation_z),
         toNull(rpm_motor), toNull(velocity_x), toNull(velocity_y), toNull(ambient_temp), toNull(steering_direction),
