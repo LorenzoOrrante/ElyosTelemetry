@@ -23,7 +23,7 @@ for (const name of Object.keys(nets)) {
 
 dotenv.config({ path: './env/.env' });
 
-const PORT = process.env.PORT || 4999;
+const PORT = Number(process.env.PORT) || 8080;
 
 const server = http.createServer(app);
 
@@ -110,18 +110,28 @@ io.on("connection", (socket) => {
   });
 });
 
+// Start the HTTP server regardless of DB status.
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Servidor listo!`);
+  console.log(`🌐 En esta laptop: http://localhost:${PORT}`);
+  console.log(`📱 En otros dispositivos: http://${localIp}:${PORT}`);
+});
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`🔴 Port ${PORT} is already in use.`);
+    process.exit(1);
+  }
+
+  console.error("🔴 HTTP server error:", err);
+  process.exit(1);
+});
+
 try {
   const client = await pool.connect();
   const res = await client.query("SELECT NOW()");
   console.log("🟢 Data Base Connected:", res.rows[0]);
   client.release();
-
-  // 4. IMPORTANTE: Usar server.listen en lugar de app.listen
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Servidor listo!`);
-    console.log(`🌐 En esta laptop: http://localhost:${PORT}`);
-    console.log(`📱 En otros dispositivos: http://${localIp}:${PORT}`);
-  });
 } catch (err) {
   console.error("🔴 Error while trying to connect to the data base:", err.stack);
 }
