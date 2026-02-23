@@ -17,6 +17,15 @@ app.use(cors());
 app.use(express.json()); // To parse JSON on petitions
 app.use(morgan('dev')); // Logger of HTPP petitions
 
+// Health endpoints for platform probes
+app.get('/health', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
+app.get('/', (_req, res) => {
+  res.status(200).send('OK');
+});
+
 // Routes
 app.use('/api/lectures', lectureRoutes);
 app.use('/api/pilots', pilotRoutes);
