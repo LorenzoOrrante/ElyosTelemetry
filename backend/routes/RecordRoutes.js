@@ -3,6 +3,7 @@ import {
     startRecording,
     stopRecording,
     statusRecording,
+    createNewLap,
     saveRecording,
     sendMessage,
     getMessage
@@ -18,6 +19,9 @@ router.post('/pause', stopRecording);
 
 // Status recording
 router.get('/status', statusRecording);
+
+// Create new lap
+router.post('/newLap', createNewLap);
 
 // Send message
 router.post('/message', sendMessage);

@@ -1,4 +1,3 @@
-import express from 'express';
 import { setIsRunning, getIsRunning } from '../isRunning.js';
 import pool from '../config/dbConfig.js';
 import buildLecturesXlsxBuffer from '../excel/export.js';
@@ -20,6 +19,16 @@ export const stopRecording = async (req, res) => {
 // Status recording
 export const statusRecording = async (req, res) => {
     res.json({ isRunning: getIsRunning() });
+};
+
+// Create a new lap
+export const createNewLap = async (req, res) => {
+    if (!getIsRunning()) {
+        return res.status(409).json({ error: 'Cannot create a new lap while recording is stopped' });
+    }
+
+    // The lap increment is handled by Socket.IO "NEW_LAP" action in server.js.
+    res.status(200).json({ message: 'New lap accepted' });
 };
 
 // Send message
