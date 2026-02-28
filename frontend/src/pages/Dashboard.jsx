@@ -13,10 +13,10 @@ import RaceStats from "../components/RaceStats";
 import Battery from "../components/Battery";
 
 const currentHost = window.location.hostname;
-const socket = io(`http://${currentHost}:4999`);
+const socket = io(`http://${currentHost}:8080`);
 
 const DashboardPage = () => {
-  const API_BASE = `http://${currentHost}:4999`;
+  const API_BASE = `http://${currentHost}:8080`;
 
   // States
   const [canControl, setCanControl] = useState(false);
